@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (All-in-One Generator)
 
 on:
   push:
@@ -19,15 +19,497 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install & Run Gradle Build
+      - name: Generate Complete Android Project Structure
+        run: |
+          # 1. Clean previous invalid structures
+          rm -rf gradle/wrapper/app 2>/dev/null || true
+
+          # 2. Create required directory hierarchy
+          mkdir -p app/src/main/java/com/example/mindfullock
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+
+          # 3. Root settings.gradle.kts
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MindfulLock"
+          include(":app")
+          EOF
+
+          # 4. Root build.gradle.kts
+          cat << 'EOF' > build.gradle.kts
+          plugins {
+              id("com.android.application") version "8.2.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+          }
+          EOF
+
+          # 5. App build.gradle.kts
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.example.mindfullock"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.example.mindfullock"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      proguardFiles(
+                          getDefaultProguardFile("proguard-android-optimize.txt"),
+                          "proguard-rules.pro"
+                      )
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.appcompat:appcompat:1.6.1")
+              implementation("com.google.android.material:material:1.11.0")
+              implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+          }
+          EOF
+
+          # 6. AndroidManifest.xml
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.example.mindfullock">
+
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="MindfulLock"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <receiver
+                      android:name=".LockAdminReceiver"
+                      android:permission="android.permission.BIND_DEVICE_ADMIN"
+                      android:exported="true">
+                      <meta-data
+                          android:name="android.app.device_admin"
+                          android:resource="@xml/device_admin_policies" />
+                      <intent-filter>
+                          <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                      </intent-filter>
+                  </receiver>
+
+                  <service
+                      android:name=".SessionService"
+                      android:foregroundServiceType="specialUse"
+                      android:exported="false" />
+              </application>
+          </manifest>
+          EOF
+
+          # 7. Device Admin Policies
+          cat << 'EOF' > app/src/main/res/xml/device_admin_policies.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-policies>
+                  <force-lock />
+              </uses-policies>
+          </device-admin>
+          EOF
+
+          # 8. strings.xml & themes.xml
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <resources>
+              <string name="app_name">MindfulLock</string>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <resources>
+              <style name="Theme.MindfulLock" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+                  <item name="colorPrimary">#0284C7</item>
+                  <item name="android:statusBarColor">#0F172A</item>
+              </style>
+          </resources>
+          EOF
+
+          # 9. UI Layout: activity_main.xml
+          cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#0F172A"
+              android:gravity="center"
+              android:orientation="vertical"
+              android:padding="24dp">
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="MindfulLock"
+                  android:textColor="#38BDF8"
+                  android:textSize="26sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginBottom="24dp"
+                  android:text="Set intention and time before use"
+                  android:textColor="#94A3B8"
+                  android:textSize="13sp" />
+
+              <EditText
+                  android:id="@+id/editReason"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:background="#1E293B"
+                  android:hint="Why do you need your phone?"
+                  android:padding="14dp"
+                  android:textColor="#FFFFFF"
+                  android:textColorHint="#64748B"
+                  android:textSize="14sp" />
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="16dp"
+                  android:orientation="horizontal">
+
+                  <EditText
+                      android:id="@+id/editMinutes"
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:background="#1E293B"
+                      android:hint="Minutes (e.g. 2)"
+                      android:inputType="number"
+                      android:padding="14dp"
+                      android:textColor="#FFFFFF"
+                      android:textColorHint="#64748B"
+                      android:textSize="14sp" />
+
+                  <Space
+                      android:layout_width="12dp"
+                      android:layout_height="wrap_content" />
+
+                  <EditText
+                      android:id="@+id/editSeconds"
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:background="#1E293B"
+                      android:hint="Seconds (e.g. 30)"
+                      android:inputType="number"
+                      android:padding="14dp"
+                      android:textColor="#FFFFFF"
+                      android:textColorHint="#64748B"
+                      android:textSize="14sp" />
+              </LinearLayout>
+
+              <Button
+                  android:id="@+id/btnStart"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="20dp"
+                  android:backgroundTint="#0284C7"
+                  android:padding="14dp"
+                  android:text="Start Intentional Session"
+                  android:textColor="#FFFFFF"
+                  android:textStyle="bold" />
+
+              <Button
+                  android:id="@+id/btnTemp60s"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="12dp"
+                  android:backgroundTint="#D97706"
+                  android:padding="14dp"
+                  android:text="⚡ Temp Pass (60 Seconds)"
+                  android:textColor="#FFFFFF"
+                  android:textStyle="bold" />
+
+          </LinearLayout>
+          EOF
+
+          # 10. LockAdminReceiver.kt
+          cat << 'EOF' > app/src/main/java/com/example/mindfullock/LockAdminReceiver.kt
+          package com.example.mindfullock
+
+          import android.app.admin.DeviceAdminReceiver
+          import android.content.Context
+          import android.content.Intent
+          import android.widget.Toast
+
+          class LockAdminReceiver : DeviceAdminReceiver() {
+              override fun onEnabled(context: Context, intent: Intent) {
+                  super.onEnabled(context, intent)
+                  Toast.makeText(context, "MindfulLock: Device Admin Active", Toast.LENGTH_SHORT).show()
+              }
+
+              override fun onDisabled(context: Context, intent: Intent) {
+                  super.onDisabled(context, intent)
+                  Toast.makeText(context, "MindfulLock: Device Admin Deactivated", Toast.LENGTH_SHORT).show()
+              }
+          }
+          EOF
+
+          # 11. SessionService.kt
+          cat << 'EOF' > app/src/main/java/com/example/mindfullock/SessionService.kt
+          package com.example.mindfullock
+
+          import android.app.Notification
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.Service
+          import android.app.admin.DevicePolicyManager
+          import android.content.ComponentName
+          import android.content.Context
+          import android.content.Intent
+          import android.os.Build
+          import android.os.CountDownTimer
+          import android.os.IBinder
+          import androidx.core.app.NotificationCompat
+
+          class SessionService : Service() {
+
+              private var timer: CountDownTimer? = null
+              private lateinit var dpm: DevicePolicyManager
+              private lateinit var adminComponent: ComponentName
+
+              override fun onCreate() {
+                  super.onCreate()
+                  dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                  adminComponent = ComponentName(this, LockAdminReceiver::class.java)
+                  createNotificationChannel()
+              }
+
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  val totalSeconds = intent?.getIntExtra("SECONDS", 60) ?: 60
+                  val reason = intent?.getStringExtra("REASON") ?: "Quick session"
+
+                  val notification = createNotification("Active Session: $reason", "Remaining: ${totalSeconds}s")
+                  startForeground(101, notification)
+
+                  timer?.cancel()
+                  timer = object : CountDownTimer((totalSeconds * 1000).toLong(), 1000) {
+                      override fun onTick(millisUntilFinished: Long) {
+                          val secRemaining = millisUntilFinished / 1000
+                          updateNotification("Active: $reason", "Remaining: ${secRemaining}s")
+                      }
+
+                      override fun onFinish() {
+                          if (dpm.isAdminActive(adminComponent)) {
+                              dpm.lockNow()
+                          }
+                          stopForeground(true)
+                          stopSelf()
+                      }
+                  }.start()
+
+                  return START_NOT_STICKY
+              }
+
+              private fun createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val channel = NotificationChannel(
+                          "mindful_lock_channel",
+                          "Mindful Lock Session",
+                          NotificationManager.IMPORTANCE_LOW
+                      )
+                      val manager = getSystemService(NotificationManager::class.java)
+                      manager.createNotificationChannel(channel)
+                  }
+              }
+
+              private fun createNotification(title: String, content: String): Notification {
+                  return NotificationCompat.Builder(this, "mindful_lock_channel")
+                      .setContentTitle(title)
+                      .setContentText(content)
+                      .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+                      .setOngoing(true)
+                      .build()
+              }
+
+              private fun updateNotification(title: String, content: String) {
+                  val notification = createNotification(title, content)
+                  val manager = getSystemService(NotificationManager::class.java)
+                  manager.notify(101, notification)
+              }
+
+              override fun onDestroy() {
+                  timer?.cancel()
+                  super.onDestroy()
+              }
+
+              override fun onBind(intent: Intent?): IBinder? = null
+          }
+          EOF
+
+          # 12. MainActivity.kt
+          cat << 'EOF' > app/src/main/java/com/example/mindfullock/MainActivity.kt
+          package com.example.mindfullock
+
+          import android.app.admin.DevicePolicyManager
+          import android.content.ComponentName
+          import android.content.Context
+          import android.content.Intent
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
+          import android.provider.Settings
+          import android.widget.Button
+          import android.widget.EditText
+          import android.widget.Toast
+          import androidx.appcompat.app.AppCompatActivity
+
+          class MainActivity : AppCompatActivity() {
+
+              private lateinit var dpm: DevicePolicyManager
+              private lateinit var adminComponent: ComponentName
+
+              private lateinit var editReason: EditText
+              private lateinit var editMinutes: EditText
+              private lateinit var editSeconds: EditText
+              private lateinit var btnStart: Button
+              private lateinit var btnTemp60s: Button
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_main)
+
+                  dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                  adminComponent = ComponentName(this, LockAdminReceiver::class.java)
+
+                  editReason = findViewById(R.id.editReason)
+                  editMinutes = findViewById(R.id.editMinutes)
+                  editSeconds = findViewById(R.id.editSeconds)
+                  btnStart = findViewById(R.id.btnStart)
+                  btnTemp60s = findViewById(R.id.btnTemp60s)
+
+                  checkPermissions()
+
+                  btnStart.setOnClickListener {
+                      val reason = editReason.text.toString().trim()
+                      val mins = editMinutes.text.toString().toIntOrNull() ?: 0
+                      val secs = editSeconds.text.toString().toIntOrNull() ?: 0
+                      val totalSeconds = (mins * 60) + secs
+
+                      if (reason.isEmpty()) {
+                          Toast.makeText(this, "Please enter your reason!", Toast.LENGTH_SHORT).show()
+                          return@setOnClickListener
+                      }
+
+                      if (totalSeconds <= 0) {
+                          Toast.makeText(this, "Please set a duration greater than 0s", Toast.LENGTH_SHORT).show()
+                          return@setOnClickListener
+                      }
+
+                      startLockSession(reason, totalSeconds)
+                  }
+
+                  btnTemp60s.setOnClickListener {
+                      startLockSession("Emergency 60s Pass", 60)
+                  }
+              }
+
+              private fun startLockSession(reason: String, seconds: Int) {
+                  val serviceIntent = Intent(this, SessionService::class.java).apply {
+                      putExtra("REASON", reason)
+                      putExtra("SECONDS", seconds)
+                  }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      startForegroundService(serviceIntent)
+                  } else {
+                      startService(serviceIntent)
+                  }
+
+                  Toast.makeText(this, "Session started: $seconds sec", Toast.LENGTH_SHORT).show()
+                  val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                      addCategory(Intent.CATEGORY_HOME)
+                      flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                  }
+                  startActivity(homeIntent)
+              }
+
+              private fun checkPermissions() {
+                  if (!dpm.isAdminActive(adminComponent)) {
+                      val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                          putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                          putExtra(
+                              DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                              "Enable MindfulLock to automatically lock the screen when your time expires."
+                          )
+                      }
+                      startActivity(intent)
+                  }
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                      val intent = Intent(
+                          Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                          Uri.parse("package:$packageName")
+                      )
+                      startActivity(intent)
+                  }
+              }
+          }
+          EOF
+
+      - name: Build APK with Gradle
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: '8.5'
           arguments: assembleDebug --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
-          name: MindfulLock-Debug-APK
+          name: MindfulLock-APK
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14

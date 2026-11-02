@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.MindfulLock" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#0284C7</item>
+        <item name="android:statusBarColor">#0F172A</item>
+    </style>
+</resources>
